@@ -180,7 +180,11 @@
 
 #+headers: :var letters='(a b c d e f g)
 #+begin_src emacs-lisp :var numbers='(1 2 3 4 5 6 7)
-  (map 'list #'list numbers letters)
+  (require 'cl)
+  (defalias 'my-map (if (org-version-check \"24.2.50\" \"cl\" :predicate)
+                        'cl-map
+                      'map))
+  (my-map 'list #'list numbers letters)
 #+end_src"
 
     (progn
@@ -688,7 +692,7 @@ on two lines
       (forward-line)
       (should
        (string=
-	"" 
+	""
 	(buffer-substring-no-properties (point-at-bol) (point-at-eol))))))
   (org-test-with-temp-text-in-file "
 #+begin_src emacs-lisp
@@ -702,7 +706,7 @@ on two lines
       (forward-line)
       (should
        (string=
-	": some text" 
+	": some text"
 	(buffer-substring-no-properties (point-at-bol) (point-at-eol)))))))
 
 (ert-deftest test-ob/commented-last-block-line-with-var ()
@@ -716,7 +720,7 @@ on two lines
       (re-search-forward "\\#\\+results:" nil t)
       (forward-line)
       (should (string=
-	       "" 
+	       ""
 	       (buffer-substring-no-properties (point-at-bol) (point-at-eol))))))
   (org-test-with-temp-text-in-file "
 #+begin_src emacs-lisp :var a=2
@@ -728,7 +732,7 @@ on two lines
       (re-search-forward "\\#\\+results:" nil t)
       (forward-line)
       (should (string=
-	       ": 2" 
+	       ": 2"
 	       (buffer-substring-no-properties (point-at-bol) (point-at-eol)))))))
 
 (defun test-ob-verify-result-and-removed-result (result buffer-text)
@@ -744,7 +748,7 @@ replacement happens correctly."
       (org-babel-next-src-block) (org-ctrl-c-ctrl-c) (org-ctrl-c-ctrl-c)
       (should (re-search-forward "\\#\\+results:" nil t))
       (forward-line)
-      (should (string= result 
+      (should (string= result
 		       (buffer-substring-no-properties
 			(point-at-bol)
 			(- (point-max) 16))))
@@ -810,86 +814,6 @@ trying to find the :END: marker."
     (should (search-forward "[[file:foo][bar]]" nil t))
     (should (search-forward "[[file:foo][foo]]" nil t))))
 
-(ert-deftest test-ob/org-babel-remove-result--results-wrap ()
-  "Test `org-babel-remove-result' with :results wrap."
-  (test-ob-verify-result-and-removed-result
-   ":RESULTS:
-hello there
-:END:"
-
- "* org-babel-remove-result
-
-#+begin_src emacs-lisp :results wrap
-\"hello there\"
-#+end_src
-
-* next heading"))
-
-(ert-deftest test-ob/org-babel-remove-result--results-org ()
-  "Test `org-babel-remove-result' with :results org."
-  (test-ob-verify-result-and-removed-result
-   "#+BEGIN_ORG
-* heading
-** subheading
-content
-#+END_ORG"
-
-"* org-babel-remove-result
-#+begin_src emacs-lisp :results org
-\"* heading
-** subheading
-content\"
-#+end_src
-
-* next heading"))
-
-(ert-deftest test-ob/org-babel-remove-result--results-html ()
-  "Test `org-babel-remove-result' with :results html."
-  (test-ob-verify-result-and-removed-result
-   "#+BEGIN_HTML
-<head><body></body></head>
-#+END_HTML"
-
-"* org-babel-remove-result
-#+begin_src emacs-lisp :results html
-\"<head><body></body></head>\"
-#+end_src
-
-* next heading"))
-
-(ert-deftest test-ob/org-babel-remove-result--results-latex ()
-  "Test `org-babel-remove-result' with :results latex."
-  (test-ob-verify-result-and-removed-result
-   "#+BEGIN_LaTeX
-Line 1
-Line 2
-Line 3
-#+END_LaTeX"
-
-"* org-babel-remove-result
-#+begin_src emacs-lisp :results latex
-\"Line 1
-Line 2
-Line 3\"
-#+end_src
-
-* next heading"))
-
-(ert-deftest test-ob/org-babel-remove-result--results-code ()
-  "Test `org-babel-remove-result' with :results code."
-
-  (test-ob-verify-result-and-removed-result
-   "#+BEGIN_SRC emacs-lisp
-\"I am working!\"
-#+END_SRC"
-
-"* org-babel-remove-result
-#+begin_src emacs-lisp :results code
-(message \"I am working!\")
-#+end_src
-
-* next heading"))
-
 (ert-deftest test-ob/org-babel-remove-result--results-pp ()
   "Test `org-babel-remove-result' with :results pp."
   (test-ob-verify-result-and-removed-result
@@ -922,7 +846,7 @@ Line 3\"
       (re-search-forward "\\#\\+results:" nil t)
       (forward-line)
       (should (string=
-	       "" 
+	       ""
 	       (buffer-substring-no-properties (point-at-bol) (point-at-eol))))))
   (org-test-with-temp-text-in-file "
 #+begin_src emacs-lisp :var a=2
@@ -934,7 +858,7 @@ Line 3\"
       (re-search-forward "\\#\\+results:" nil t)
       (forward-line)
       (should (string=
-	       ": 2" 
+	       ": 2"
 	       (buffer-substring-no-properties (point-at-bol) (point-at-eol)))))))
 
 (defun test-ob-verify-result-and-removed-result (result buffer-text)
@@ -950,7 +874,7 @@ replacement happens correctly."
       (org-babel-next-src-block) (org-ctrl-c-ctrl-c) (org-ctrl-c-ctrl-c)
       (should (re-search-forward "\\#\\+results:" nil t))
       (forward-line)
-      (should (string= result 
+      (should (string= result
 		       (buffer-substring-no-properties
 			(point-at-bol)
 			(- (point-max) 16))))
@@ -1005,11 +929,11 @@ hello there
 (ert-deftest test-ob/org-babel-remove-result--results-org ()
   "Test `org-babel-remove-result' with :results org."
   (test-ob-verify-result-and-removed-result
-   "#+BEGIN_ORG
-* heading
-** subheading
+   "#+BEGIN_SRC org
+,* heading
+,** subheading
 content
-#+END_ORG"
+#+END_SRC"
 
 "* org-babel-remove-result
 #+begin_src emacs-lisp :results org

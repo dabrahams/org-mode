@@ -52,12 +52,13 @@
 This function is called by `org-babel-execute-src-block'."
   (let* ((result-params (split-string (or (cdr (assoc :results params)) "")))
 	 (out-file (or (cdr (assoc :file params))
-		       (error "plantuml requires a \":file\" header argument")))
+		       (error "PlantUML requires a \":file\" header argument")))
 	 (cmdline (cdr (assoc :cmdline params)))
 	 (in-file (org-babel-temp-file "plantuml-"))
+	 (java (or (cdr (assoc :java params)) ""))
 	 (cmd (if (not org-plantuml-jar-path)
 		  (error "`org-plantuml-jar-path' is not set")
-		(concat "java -jar "
+		(concat "java " java " -jar "
 			(shell-quote-argument
 			 (expand-file-name org-plantuml-jar-path))
 			(if (string= (file-name-extension out-file) "svg")

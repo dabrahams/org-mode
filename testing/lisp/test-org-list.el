@@ -113,6 +113,111 @@
 	(org-previous-item)
 	(should (looking-at "  - item 1.3"))))))
 
+(ert-deftest test-org-list/cycle-bullet ()
+  "Test `org-cycle-list-bullet' specifications."
+  ;; Error when not at an item.
+  (should-error
+   (org-test-with-temp-text "Paragraph"
+     (org-cycle-list-bullet)))
+  ;; Cycle through "-", "+", "*", "1.", "1)".
+  (org-test-with-temp-text "  - item"
+    (org-cycle-list-bullet)
+    (should (looking-at "[ \t]+\\+"))
+    (org-cycle-list-bullet)
+    (should (looking-at "[ \t]+\\*"))
+    (let ((org-plain-list-ordered-item-terminator t))
+      (org-cycle-list-bullet))
+    (should (looking-at "[ \t]+1\\."))
+    (let ((org-plain-list-ordered-item-terminator t))
+      (org-cycle-list-bullet))
+    (should (looking-at "[ \t]+1)")))
+  ;; Argument is a valid bullet: cycle to that bullet directly.
+  (should
+   (equal "1. item"
+	  (org-test-with-temp-text "- item"
+	    (let ((org-plain-list-ordered-item-terminator t))
+	      (org-cycle-list-bullet "1.")
+	      (buffer-string)))))
+  ;; Argument is an integer N: cycle to the Nth allowed bullet.
+  (should
+   (equal "+ item"
+	  (org-test-with-temp-text "1. item"
+	    (let ((org-plain-list-ordered-item-terminator t))
+	      (org-cycle-list-bullet 1)
+	      (buffer-string)))))
+  ;; Argument is `previous': cycle backwards.
+  (should
+   (equal "- item"
+	  (org-test-with-temp-text "+ item"
+	    (let ((org-plain-list-ordered-item-terminator t))
+	      (org-cycle-list-bullet 'previous)
+	      (buffer-string)))))
+  ;; Do not cycle to "*" bullets when item is at column 0.
+  (should
+   (equal "1. item"
+	  (org-test-with-temp-text "+ item"
+	    (let ((org-plain-list-ordered-item-terminator t))
+	      (org-cycle-list-bullet)
+	      (buffer-string)))))
+  ;; Do not cycle to numbered bullets in a description list.
+  (should-not
+   (equal "1. tag :: item"
+	  (org-test-with-temp-text "+ tag :: item"
+	    (let ((org-plain-list-ordered-item-terminator t))
+	      (org-cycle-list-bullet)
+	      (buffer-string)))))
+  ;; Do not cycle to ordered item terminators if they are not allowed
+  ;; in `org-plain-list-ordered-item-terminator'.
+  (should
+   (equal "  1) item"
+	  (org-test-with-temp-text "  * item"
+	    (let ((org-plain-list-ordered-item-terminator 41))
+	      (org-cycle-list-bullet)
+	      (buffer-string)))))
+  ;; When `org-alphabetical-lists' is non-nil, cycle to alpha bullets.
+  (should
+   (equal "a. item"
+	  (org-test-with-temp-text "1) item"
+	    (let ((org-plain-list-ordered-item-terminator t)
+		  (org-alphabetical-lists t))
+	      (org-cycle-list-bullet)
+	      (buffer-string)))))
+  ;; Do not cycle to alpha bullets when list has more than 26
+  ;; elements.
+  (should-not
+   (equal "a. item 1"
+	  (org-test-with-temp-text "1) item 1
+2) item 2
+3) item 3
+4) item 4
+5) item 5
+6) item 6
+7) item 7
+8) item 8
+9) item 9
+10) item 10
+11) item 11
+12) item 12
+13) item 13
+14) item 14
+15) item 15
+16) item 16
+17) item 17
+18) item 18
+19) item 19
+20) item 20
+21) item 21
+22) item 22
+23) item 23
+24) item 24
+25) item 25
+26) item 26
+27) item 27"
+	    (let ((org-plain-list-ordered-item-terminator t)
+		  (org-alphabetical-lists t))
+	      (org-cycle-list-bullet)
+	      (buffer-substring (point) (line-end-position)))))))
+
 (ert-deftest test-org-list/indent-item ()
   "Test `org-indent-item' specifications."
   ;; 1. Error when not at an item.
@@ -357,6 +462,169 @@
 - Item 3
   - Item 3.1
 "))))
+
+(ert-deftest test-org-list/move-item-down ()
+  "Test `org-move-item-down' specifications."
+  ;; Standard test.
+  (org-test-with-temp-text "- item 1\n- item 2"
+    (org-move-item-down)
+    (should (equal (buffer-string)
+		   "- item 2\n- item 1")))
+  ;; Keep same column in item.
+  (org-test-with-temp-text "- item 1\n- item 2"
+    (forward-char 4)
+    (org-move-item-down)
+    (should (looking-at "em 1")))
+  ;; Move sub-items.
+  (org-test-with-temp-text "- item 1\n  - sub-item 1\n- item 2"
+    (org-move-item-down)
+    (should (equal (buffer-string)
+		   "- item 2\n- item 1\n  - sub-item 1")))
+  ;; Preserve blank lines.
+  (org-test-with-temp-text "- item 1\n\n- item 2"
+    (let ((org-empty-line-terminates-plain-lists nil)) (org-move-item-down))
+    (should (equal (buffer-string) "- item 2\n\n- item 1")))
+  ;; Error when trying to move the last item...
+  (org-test-with-temp-text "- item 1\n- item 2"
+    (forward-line)
+    (should-error (org-move-item-down)))
+  ;; ... unless `org-list-use-circular-motion' is non-nil.  In this
+  ;; case, move to the first item.
+  (org-test-with-temp-text "- item 1\n- item 2\n- item 3"
+    (forward-line 2)
+    (let ((org-list-use-circular-motion t)) (org-move-item-down))
+    (should (equal (buffer-string) "- item 3\n- item 1\n- item 2\n")))
+  ;; Preserve item visibility.
+  (org-test-with-temp-text "* Headline\n- item 1\n  body 1\n- item 2\n  body 2"
+    (let ((org-cycle-include-plain-lists t))
+      (search-forward "- item 1")
+      (org-cycle)
+      (search-forward "- item 2")
+      (org-cycle))
+    (search-backward "- item 1")
+    (org-move-item-down)
+    (forward-line)
+    (should (org-invisible-p2))
+    (search-backward " body 2")
+    (should (org-invisible-p2)))
+  ;; Preserve children visibility.
+  (org-test-with-temp-text "* Headline
+- item 1
+  - sub-item 1
+    sub-body 1
+- item 2
+  - sub-item 2
+    sub-body 2"
+    (let ((org-cycle-include-plain-lists t))
+      (search-forward "- sub-item 1")
+      (org-cycle)
+      (search-forward "- sub-item 2")
+      (org-cycle))
+    (search-backward "- item 1")
+    (org-move-item-down)
+    (search-forward "sub-body 1")
+    (should (org-invisible-p2))
+    (search-backward "sub-body 2")
+    (should (org-invisible-p2)))
+  ;; Preserve contents visibility.
+  (org-test-with-temp-text "
+- item 1
+  #+BEGIN_CENTER
+  Text1
+  #+END_CENTER
+- item 2
+  #+BEGIN_CENTER
+  Text2
+  #+END_CENTER"
+    (org-hide-block-all)
+    (search-forward "- item 1")
+    (org-move-item-down)
+    (search-forward "Text1")
+    (should (org-invisible-p2))
+    (search-backward "Text2")
+    (should (org-invisible-p2))))
+
+(ert-deftest test-org-list/move-item-up ()
+  "Test `org-move-item-up' specifications."
+  ;; Standard test.
+  (org-test-with-temp-text "- item 1\n- item 2"
+    (forward-line)
+    (org-move-item-up)
+    (should (equal (buffer-string)
+		   "- item 2\n- item 1")))
+  ;; Keep same column in item.
+  (org-test-with-temp-text "- item 1\n- item 2"
+    (forward-line)
+    (forward-char 4)
+    (org-move-item-up)
+    (should (looking-at "em 2")))
+  ;; Move sub-items.
+  (org-test-with-temp-text "- item 1\n- item 2\n  - sub-item 2"
+    (forward-line)
+    (org-move-item-up)
+    (should (equal (buffer-string)
+		   "- item 2\n  - sub-item 2\n- item 1")))
+  ;; Preserve blank lines.
+  (org-test-with-temp-text "- item 1\n\n- item 2"
+    (search-forward "- item 2")
+    (let ((org-empty-line-terminates-plain-lists nil)) (org-move-item-up))
+    (should (equal (buffer-string) "- item 2\n\n- item 1")))
+  ;; Error when trying to move the first item...
+  (org-test-with-temp-text "- item 1\n- item 2"
+    (should-error (org-move-item-up)))
+  ;; ... unless `org-list-use-circular-motion' is non-nil.  In this
+  ;; case, move to the first item.
+  (org-test-with-temp-text "- item 1\n- item 2\n- item 3"
+    (let ((org-list-use-circular-motion t)) (org-move-item-up))
+    (should (equal (buffer-string) "- item 2\n- item 3\n- item 1")))
+  ;; Preserve item visibility.
+  (org-test-with-temp-text "* Headline\n- item 1\n  body 1\n- item 2\n  body 2"
+    (let ((org-cycle-include-plain-lists t))
+      (search-forward "- item 1")
+      (org-cycle)
+      (search-forward "- item 2")
+      (org-cycle))
+    (org-move-item-up)
+    (forward-line)
+    (should (org-invisible-p2))
+    (search-forward " body 1")
+    (should (org-invisible-p2)))
+  ;; Preserve children visibility.
+  (org-test-with-temp-text "* Headline
+- item 1
+  - sub-item 1
+    sub-body 1
+- item 2
+  - sub-item 2
+    sub-body 2"
+    (let ((org-cycle-include-plain-lists t))
+      (search-forward "- sub-item 1")
+      (org-cycle)
+      (search-forward "- sub-item 2")
+      (org-cycle))
+    (search-backward "- item 2")
+    (org-move-item-up)
+    (search-forward "sub-body 2")
+    (should (org-invisible-p2))
+    (search-forward "sub-body 1")
+    (should (org-invisible-p2)))
+  ;; Preserve contents visibility.
+  (org-test-with-temp-text "
+- item 1
+  #+BEGIN_CENTER
+  Text1
+  #+END_CENTER
+- item 2
+  #+BEGIN_CENTER
+  Text2
+  #+END_CENTER"
+    (org-hide-block-all)
+    (search-forward "- item 2")
+    (org-move-item-up)
+    (search-forward "Text2")
+    (should (org-invisible-p2))
+    (search-forward "Text1")
+    (should (org-invisible-p2))))
 
 
 (provide 'test-org-list)

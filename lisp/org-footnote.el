@@ -450,7 +450,8 @@ or new, let the user edit the definition of the footnote."
     (error "Cannot insert a footnote here"))
   (let* ((lbls (and (not (equal org-footnote-auto-label 'random))
 		    (org-footnote-all-labels)))
-	 (propose (org-footnote-unique-label lbls))
+	 (propose (and (not (equal org-footnote-auto-label 'random))
+		       (org-footnote-unique-label lbls)))
 	 (label
 	  (org-footnote-normalize-label
 	   (cond
@@ -892,7 +893,7 @@ If LABEL is non-nil, delete that footnote instead."
 	   (label (cond
 		   ;; LABEL is provided as argument.
 		   (label)
-		   ;; Footnote reference at point. If the footnote is
+		   ;; Footnote reference at point.  If the footnote is
 		   ;; anonymous, delete it and exit instead.
 		   ((setq x (org-footnote-at-reference-p))
 		    (or (car x)
@@ -947,5 +948,9 @@ If LABEL is non-nil, delete that footnote instead."
 		    (just-one-space)))))))
 
 (provide 'org-footnote)
+
+;; Local variables:
+;; generated-autoload-file: "org-loaddefs.el"
+;; End:
 
 ;;; org-footnote.el ends here

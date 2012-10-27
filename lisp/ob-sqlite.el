@@ -33,7 +33,8 @@
 (declare-function org-fill-template "org" (template alist))
 (declare-function org-table-convert-region "org-table"
 		  (beg0 end0 &optional separator))
-(declare-function orgtbl-to-csv "org-table" (TABLE PARAMS))
+(declare-function orgtbl-to-csv "org-table" (table params))
+(declare-function org-table-to-lisp "org-table" (&optional txt))
 
 (defvar org-babel-default-header-args:sqlite '())
 
@@ -71,7 +72,7 @@ This function is called by `org-babel-execute-src-block'."
 			   (list :header :echo :bail :column
 				 :csv :html :line :list))))
 	exit-code)
-    (unless db (error "ob-sqlite: can't evaluate without a database."))
+    (unless db (error "ob-sqlite: can't evaluate without a database"))
     (with-temp-buffer
       (insert
        (org-babel-eval
@@ -128,8 +129,8 @@ This function is called by `org-babel-execute-src-block'."
 		      (with-temp-file data-file
 			(insert (orgtbl-to-csv
 				 val '(:fmt (lambda (el) (if (stringp el)
-							el
-						      (format "%S" el)))))))
+							     el
+							   (format "%S" el)))))))
 		      data-file)
 		    (org-babel-temp-file "sqlite-data-"))
 		 (if (stringp val) val (format "%S" val))))
@@ -155,9 +156,9 @@ This function is called by `org-babel-execute-src-block'."
     table))
 
 (defun org-babel-prep-session:sqlite (session params)
-  "Raise an error because support for sqlite sessions isn't implemented.
+  "Raise an error because support for SQLite sessions isn't implemented.
 Prepare SESSION according to the header arguments specified in PARAMS."
-  (error "sqlite sessions not yet implemented"))
+  (error "SQLite sessions not yet implemented"))
 
 (provide 'ob-sqlite)
 
